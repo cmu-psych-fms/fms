@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Alhazen version 1.4.0 &#8212; Alhazen 1.4.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=9172181d"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="alhazen-version-1-4-0">
+<h1>Alhazen version 1.4.0<a class="headerlink" href="#alhazen-version-1-4-0" title="Link to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<section id="module-alhazen">
+<span id="introduction"></span><h2>Introduction<a class="headerlink" href="#module-alhazen" title="Link to this heading">¶</a></h2>
+<p>Alhazen is a small, simple framework to facilitate running experiments, written in
+Python, using cognitive models, or similar applications, in multiple, parallel processes.
+It is primarily useful on multi-core machines, though most modern machines are such; the
+more cores, the more performance benefit you are likely to get by using it. It also depends
+upon the experiment being structured as a large number of identical, independent runs of
+the same activity, or of similar activities. This is a common pattern, each such run
+usually corresponding to a distinct virtual participant, or possibly a collection of
+interacting participants.</p>
+<p>When an Alhazen experiment is run the initial process is used as a parent, controller
+process and it spawns one or more child, worker processes to run the individual tasks.
+Alhazen handles partitioning the sub-tasks between these workers, and collecting their
+results, which can then be aggregated in the parent, controller process. To use Alhazen
+you make a subclass of its <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> or <a class="reference internal" href="#alhazen.IteratedExperiment" title="alhazen.IteratedExperiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">IteratedExperiment</span></code></a> class,
+override some of its methods to describe what the workers should do and what results to
+return and aggregate, declare how many workers to use, and then call its <code class="xref py py-meth docutils literal notranslate"><span class="pre">run()</span></code>
+method.</p>
+</section>
+<section id="installing-alhazen">
+<h2>Installing Alhazen<a class="headerlink" href="#installing-alhazen" title="Link to this heading">¶</a></h2>
+<p>Alhazen requires Python version 3.7 or later. Recent versions of Mac OS X and recent Linux distributions
+are likely to have a suitable version of Python pre-installed, but it may need to be invoked as <code class="docutils literal notranslate"><span class="pre">python3</span></code>
+instead of just <code class="docutils literal notranslate"><span class="pre">python</span></code>, which latter often runs a 2.x version of Python instead. Use of a virtual environment,
+which is recommended, often obviates the need for the <code class="docutils literal notranslate"><span class="pre">python3</span></code>/<code class="docutils literal notranslate"><span class="pre">python</span></code> distinction.
+If it is not already installed, Python, for Windows, Mac OS X, Linux, or other Unices, can be
+<a class="reference external" href="http://www.python.org/download/">downloaded from python.org</a>, for free.</p>
+<p>Normally, assuming you are connected to the internet, to install Alhazen you should simply have to type at the command line</p>
+<blockquote>
+<div><div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">alhazen</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Depending upon various possible variations in how Python and your machine are configured
+you may have to modify the above in various ways</p>
+<ul class="simple">
+<li><p>you may need to ensure your virtual environment is activated</p></li>
+<li><p>you may need use an alternative scheme your Python IDE supports</p></li>
+<li><p>you may need to call it <code class="docutils literal notranslate"><span class="pre">pip3</span></code> instead of simply <code class="docutils literal notranslate"><span class="pre">pip</span></code></p></li>
+<li><p>you may need to precede the call to <code class="docutils literal notranslate"><span class="pre">pip</span></code> by <code class="docutils literal notranslate"><span class="pre">sudo</span></code></p></li>
+<li><p>you may need to use some combination of the above</p></li>
+</ul>
+</section>
+<section id="mailing-list">
+<h2>Mailing List<a class="headerlink" href="#mailing-list" title="Link to this heading">¶</a></h2>
+<p>There is a <a class="reference external" href="https://lists.andrew.cmu.edu/mailman/listinfo/alhazen-users">mailing list</a> for those interested in Alhazen and its development.</p>
+</section>
+<section id="tutorial">
+<h2>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading">¶</a></h2>
+<p>As an example we will model a player performing an iterated, binary
+choice task, where one of the two available choices is “safe,” always
+earning the player one point, and the other is “risky,” sometimes earning
+the player ten points, but more frequently zero, but with the
+probability of the high payoff set to 0.1 so that the expected value
+of either choice is one point. The player has no <em>a priori</em> knowledge
+of the game, and learns of it from experience. Some number of
+virtual participants will perform this task for a fixed number of
+rounds, learning from their past experiences in earlier rounds. Then
+we’ll graph the average number of times a participant made the risky
+choice as a function of the round. In our implementation the simulated
+participants’ actions will be decided by an
+<a class="reference external" href="https://www.sciencedirect.com/science/article/abs/pii/S0364021303000314">Instance Based Learning</a>
+model, written using <a class="reference external" href="https://halle.psy.cmu.edu/pyactup/">PyACTUp</a>.</p>
+<p>First we start by making a subclass of the Alhazen
+<a class="reference internal" href="#alhazen.IteratedExperiment" title="alhazen.IteratedExperiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">IteratedExperiment</span></code></a> class, and override its
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_prepare()</span></code> method to allocate for each
+participant a PyACTUp <code class="docutils literal notranslate"><span class="pre">Memory</span></code> object. This method will be called
+within a worker process, and for this example we will ignore the
+<em>participant</em>, <em>condition</em> and <em>context</em> parameters to this method.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">alhazen</span><span class="w"> </span><span class="kn">import</span> <span class="n">IteratedExperiment</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyactup</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SafeRisky</span><span class="p">(</span><span class="n">IteratedExperiment</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_participant_prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">participant</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span> <span class="o">=</span> <span class="n">pyactup</span><span class="o">.</span><span class="n">Memory</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>We next initialize the PyACTUp <code class="docutils literal notranslate"><span class="pre">Memory</span></code> and override the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code> method to actually implement the cognitive
+model. It makes a choice, learns the payoff that that choice produced,
+and returns whether or not it made the risky choice, for subsequent
+reporting by the parent, control process. This return value must be
+<a class="reference external" href="https://docs.python.org/3.7/library/pickle.html#pickle-picklable">picklable</a>.
+We learn instances for each of the two possible choices with a prepopulated
+instance value of twelve to ensure exploration of both choices.
+Again this method is called in a worker process, and we are ignoring
+the values of the <em>round</em>, <em>participant</em>, <em>condition</em> and <em>context</em>
+parameters.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">alhazen</span><span class="w"> </span><span class="kn">import</span> <span class="n">IteratedExperiment</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyactup</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SafeRisky</span><span class="p">(</span><span class="n">IteratedExperiment</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_participant_prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">participant</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span> <span class="o">=</span> <span class="n">pyactup</span><span class="o">.</span><span class="n">Memory</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="s2">&quot;safe&quot;</span><span class="p">,</span> <span class="n">payoff</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">advance</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="s2">&quot;risky&quot;</span><span class="p">,</span> <span class="n">payoff</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_participant_run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">round</span><span class="p">,</span> <span class="n">participant</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="n">choice</span><span class="p">,</span> <span class="n">bv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">best_blend</span><span class="p">(</span><span class="s2">&quot;payoff&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;safe&quot;</span><span class="p">,</span> <span class="s2">&quot;risky&quot;</span><span class="p">),</span> <span class="s2">&quot;choice&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">choice</span> <span class="o">==</span> <span class="s2">&quot;safe&quot;</span><span class="p">:</span>
+            <span class="n">payoff</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mf">0.1</span><span class="p">:</span>
+            <span class="n">payoff</span> <span class="o">=</span> <span class="mi">10</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">payoff</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="n">choice</span><span class="p">,</span> <span class="n">payoff</span><span class="o">=</span><span class="n">payoff</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">choice</span> <span class="o">==</span> <span class="s2">&quot;risky&quot;</span>
+</pre></div>
+</div>
+<p>This all that is required to be able to run our model in multiple
+processes. The <a class="reference internal" href="#alhazen.IteratedExperiment" title="alhazen.IteratedExperiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">IteratedExperiment</span></code></a> super-class will handle the partitioning
+of participants across worker processes, tell them to run, collect their
+results, all while correctly transferring information between the
+various processes and safely synchronizing their activities. The collected
+results will be available as the value returned by the <code class="xref py py-class docutils literal notranslate"><span class="pre">SafeRisky</span></code>’s
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">run()</span></code> method.</p>
+<p>To make use of this we will add a <code class="xref py py-func docutils literal notranslate"><span class="pre">main()</span></code> function that will
+allocate a <code class="xref py py-class docutils literal notranslate"><span class="pre">SafeRisky</span></code> object, initialized with the desired
+number of rounds and participants, call its <code class="xref py py-meth docutils literal notranslate"><span class="pre">run()</span></code> method, and
+draw a graph of the results with Matplotlib. This progream takes three
+command line arguments to specify the number of participants, number
+of rounds and number of worker processes. If these arguments are not
+provided explicitly they default to 10,000 participants, 200 rounds,
+and as many worker processes as the machine it is running in has
+(possibly virtual) cores.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">alhazen</span><span class="w"> </span><span class="kn">import</span> <span class="n">IteratedExperiment</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">click</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyactup</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SafeRisky</span><span class="p">(</span><span class="n">IteratedExperiment</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_participant_prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">participant</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span> <span class="o">=</span> <span class="n">pyactup</span><span class="o">.</span><span class="n">Memory</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="s2">&quot;safe&quot;</span><span class="p">,</span> <span class="n">payoff</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">advance</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="s2">&quot;risky&quot;</span><span class="p">,</span> <span class="n">payoff</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_participant_run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">round</span><span class="p">,</span> <span class="n">participant</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="n">choice</span><span class="p">,</span> <span class="n">bv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">best_blend</span><span class="p">(</span><span class="s2">&quot;payoff&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;safe&quot;</span><span class="p">,</span> <span class="s2">&quot;risky&quot;</span><span class="p">),</span> <span class="s2">&quot;choice&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">choice</span> <span class="o">==</span> <span class="s2">&quot;safe&quot;</span><span class="p">:</span>
+            <span class="n">payoff</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mf">0.1</span><span class="p">:</span>
+            <span class="n">payoff</span> <span class="o">=</span> <span class="mi">10</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">payoff</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="n">choice</span><span class="p">,</span> <span class="n">payoff</span><span class="o">=</span><span class="n">payoff</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">choice</span> <span class="o">==</span> <span class="s2">&quot;risky&quot;</span>
+
+<span class="nd">@click</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s2">&quot;--rounds&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;the number of rounds each participant plays&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s2">&quot;--participants&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;the number of participants&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s2">&quot;--workers&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+              <span class="n">help</span><span class="o">=</span><span class="s2">&quot;number of worker processes, zero (the default) means as many as available cores&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">rounds</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">participants</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="n">exp</span> <span class="o">=</span> <span class="n">SafeRisky</span><span class="p">(</span><span class="n">rounds</span><span class="o">=</span><span class="n">rounds</span><span class="p">,</span>
+                    <span class="n">participants</span><span class="o">=</span><span class="n">participants</span><span class="p">,</span>
+                    <span class="n">process_count</span><span class="o">=</span><span class="n">workers</span><span class="p">)</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">rounds</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span>
+             <span class="nb">list</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">)</span> <span class="o">/</span> <span class="n">participants</span>
+                      <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rounds</span><span class="p">)))</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;round&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">1.05</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;fraction choosing risky&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Safe versus Risky, </span><span class="si">{</span><span class="n">participants</span><span class="si">:</span><span class="s2">,d</span><span class="si">}</span><span class="s2"> participants&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>When run with the default command line arguments a graph like the
+following is displayed. We see that the model has a strong bias
+against the risky choice, even though it has the same expected value
+as the safe one.</p>
+<blockquote>
+<div><img alt="_images/simple.png" src="_images/simple.png" />
+</div></blockquote>
+<p>Using a particular 32 core machine, running this with <code class="docutils literal notranslate"><span class="pre">--workers=1</span></code>,
+to use just a single worker process, it requires one minute and
+thirty-nine seconds to run to completion. If instead it is run with
+<code class="docutils literal notranslate"><span class="pre">--workers=32</span></code>, to use 32 worker processes, all able to run in
+parallel on the 32 core machine, it completes in only three seconds.</p>
+<p>Often we want to run experiments like these with multiple, different
+conditions, such as different parameters to the models or to the
+tasks. This is facilitated by using the <em>conditions</em> slot of the
+<a class="reference internal" href="#alhazen.IteratedExperiment" title="alhazen.IteratedExperiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">IteratedExperiment</span></code></a> object, an iterable the elements of which
+are passed to the <code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code> method in the worker process.
+Note that the total number of participants is the product of
+<em>participants</em> and the number of conditions. A condition can be any
+Python value that is both hashable and
+<a class="reference external" href="https://docs.python.org/3.7/library/pickle.html#pickle-picklable">picklable</a>,
+Note that it is easy to run cross products of two or more orthogonal
+sets of conditions by using tuples of their elements.</p>
+<p>Here we augment the above <code class="xref py py-class docutils literal notranslate"><span class="pre">SafeRisky</span></code> implementation to use different
+probabilities for the risky choice, for different expected values of that
+choice. The values we pass as conditions will be numbers, the desired expected
+values. At the same time we enable recording the individual choices made at each round by
+each participant in a comma separated values (CSV) file, write access to which
+is synchronized across the worker processes using the <code class="xref py py-attr docutils literal notranslate"><span class="pre">log</span></code> property.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">alhazen</span><span class="w"> </span><span class="kn">import</span> <span class="n">IteratedExperiment</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">click</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">count</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyactup</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+
+<span class="n">EXPECTED_VALUES</span> <span class="o">=</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SafeRisky</span><span class="p">(</span><span class="n">IteratedExperiment</span><span class="p">):</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_participant_prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">participant</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span> <span class="o">=</span> <span class="n">pyactup</span><span class="o">.</span><span class="n">Memory</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="s2">&quot;safe&quot;</span><span class="p">,</span> <span class="n">payoff</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">advance</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="s2">&quot;risky&quot;</span><span class="p">,</span> <span class="n">payoff</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">run_participant_run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">round</span><span class="p">,</span> <span class="n">participant</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="n">choice</span><span class="p">,</span> <span class="n">bv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">best_blend</span><span class="p">(</span><span class="s2">&quot;payoff&quot;</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;safe&quot;</span><span class="p">,</span> <span class="s2">&quot;risky&quot;</span><span class="p">),</span> <span class="s2">&quot;choice&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">choice</span> <span class="o">==</span> <span class="s2">&quot;safe&quot;</span><span class="p">:</span>
+            <span class="n">payoff</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">condition</span> <span class="o">/</span> <span class="mi">10</span><span class="p">:</span>
+            <span class="n">payoff</span> <span class="o">=</span> <span class="mi">10</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">payoff</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span><span class="n">choice</span><span class="o">=</span><span class="n">choice</span><span class="p">,</span> <span class="n">payoff</span><span class="o">=</span><span class="n">payoff</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">([</span><span class="n">condition</span><span class="p">,</span> <span class="n">participant</span><span class="p">,</span> <span class="nb">round</span><span class="p">,</span> <span class="n">choice</span><span class="p">,</span> <span class="n">payoff</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">choice</span> <span class="o">==</span> <span class="s2">&quot;risky&quot;</span>
+
+
+<span class="c1"># Note that if run with the default 10,000 participants and 200 rounds the log file</span>
+<span class="c1"># will consist of nearly 10 million lines totalling nearly 200 megabytes.</span>
+
+<span class="nd">@click</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s2">&quot;--rounds&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;the number of rounds each participant plays&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s2">&quot;--participants&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;the number of participants&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s2">&quot;--workers&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+              <span class="n">help</span><span class="o">=</span><span class="s2">&quot;number of worker processes, zero (the default) means as many as available cores&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s2">&quot;--log&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;a log file to which to write details of the experiment&quot;</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">rounds</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">participants</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">exp</span> <span class="o">=</span> <span class="n">SafeRisky</span><span class="p">(</span><span class="n">rounds</span><span class="o">=</span><span class="n">rounds</span><span class="p">,</span>
+                    <span class="n">conditions</span><span class="o">=</span><span class="n">EXPECTED_VALUES</span><span class="p">,</span>
+                    <span class="n">participants</span><span class="o">=</span><span class="n">participants</span><span class="p">,</span>
+                    <span class="n">process_count</span><span class="o">=</span><span class="n">workers</span><span class="p">,</span>
+                    <span class="n">logfile</span><span class="o">=</span><span class="n">log</span><span class="p">,</span>
+                    <span class="n">csv</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">fieldnames</span><span class="o">=</span><span class="s2">&quot;expected value,participant,round,choice,payoff&quot;</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">))</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">exp</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">exp</span><span class="o">.</span><span class="n">conditions</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">rounds</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span>
+                 <span class="nb">list</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">[</span><span class="n">c</span><span class="p">])</span> <span class="o">/</span> <span class="n">participants</span>
+                          <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rounds</span><span class="p">)),</span>
+                 <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Risky EV = </span><span class="si">{</span><span class="n">c</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;round&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="o">-</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">1.05</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;fraction choosing risky&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Safe versus Risky, </span><span class="si">{</span><span class="n">participants</span><span class="si">:</span><span class="s2">,d</span><span class="si">}</span><span class="s2"> participants&quot;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span><span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>When run with the default command line arguments, a graph like the
+following is displayed. We see that the probability of getting the
+high payoff must be surprisingly high to convince the model to
+overcome its distaste for risk.</p>
+<blockquote>
+<div><img alt="_images/conditions.png" src="_images/conditions.png" />
+</div></blockquote>
+<p>Again on a 32 core machine, running this with <code class="docutils literal notranslate"><span class="pre">--workers=1</span></code>, it
+requires seven minutes and forty-three seconds, but with multiple, parallel worker
+processes,``–workers=32``, only fifteen seconds.</p>
+<p>If in addition we specify a log file when running this, the first few lines of that
+log file look something like the following.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">expected</span> <span class="n">value</span><span class="p">,</span><span class="n">participant</span><span class="p">,</span><span class="nb">round</span><span class="p">,</span><span class="n">choice</span><span class="p">,</span><span class="n">payoff</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="n">safe</span><span class="p">,</span><span class="mi">1</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="n">risky</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="n">safe</span><span class="p">,</span><span class="mi">1</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="n">safe</span><span class="p">,</span><span class="mi">1</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="n">risky</span><span class="p">,</span><span class="mi">10</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="n">risky</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="n">safe</span><span class="p">,</span><span class="mi">1</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">7</span><span class="p">,</span><span class="n">risky</span><span class="p">,</span><span class="mi">10</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">8</span><span class="p">,</span><span class="n">risky</span><span class="p">,</span><span class="mi">10</span>
+<span class="mi">5</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="n">risky</span><span class="p">,</span><span class="mi">10</span>
+</pre></div>
+</div>
+<p>See details of the API in the next section for other methods that can
+be overridden to hook into different parts of the process of running
+the experiment, as well as for the underlying <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Experiment()</span></code></a>
+class.</p>
+</section>
+<section id="api-reference">
+<h2>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h2>
+<section id="experiments">
+<h3>Experiments<a class="headerlink" href="#experiments" title="Link to this heading">¶</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="alhazen.Experiment">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">alhazen.</span></span><span class="sig-name descname"><span class="pre">Experiment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">participants</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conditions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">process_count</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_progress</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logfile</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">csv</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fieldnames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">restval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extrasaction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'raise'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dialect</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'excel'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment" title="Link to this definition">¶</a></dt>
+<dd><p>An abstract base class, concrete subclasses of which define experiments that can be
+run as a collection of independent tasks, possibly distributed to multiple worker
+processes when run on a multi-core machine. A subclass of <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> must
+at least override the <a class="reference internal" href="#alhazen.Experiment.run_participant" title="alhazen.Experiment.run_participant"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code></a> method; typically it will override one
+or more other methods.</p>
+<p>The <em>participants</em>, if supplied, should be a positive integer, the number of
+virtual participants to run. If not supplied it defaults to 1.</p>
+<p>The <em>conditions</em>, if supplied, should be an iterable of values that are both
+hashable and <a class="reference external" href="https://docs.python.org/3.7/library/pickle.html#pickle-picklable">picklable</a>. These denote
+different conditions in which the task of the <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> should be run, and
+all <em>participants</em> are run once against each condition. Multiple, orthogonal sets of
+conditions are often most easily represented as tuples of elements of the underlying
+individual sets of conditions.</p>
+<p>The <em>process_count</em>, if supplied, should be a non-negative number. If a positive
+integer it is the number of worker processes to use. Note that the overall program
+will actually contain one more process than this, the control process, which is also
+the main process in which the <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a>’s <a class="reference internal" href="#alhazen.Experiment.run" title="alhazen.Experiment.run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run()</span></code></a> method is called. If
+<em>process_count</em> is zero (the default if not supplied) it indicates that Alhazen should
+attempt to determine the number of cores available and use this number of worker
+processes. The normal Python function that provides this information includes
+“virtual” cores in its count on machines using simultaneous multithreading
+&lt;<a class="reference external" href="https://en.wikipedia.org/wiki/Simultaneous_multithreading">https://en.wikipedia.org/wiki/Simultaneous_multithreading</a>&gt;`_ (Hyper-Threading). If
+<em>process_count</em> is a positive floating point number less than one, it is multiplies by
+the number of available cores, as above, and rounded up to an integer number of worker
+processes to use. For example, if your machine does support Hyper-Threading but you
+don’t believe in the Hyper-Threading Fairy, you might supply a <em>process_count</em> value
+of <cite>0.5</cite>. If the number of cores present in the machine is needed but cannot be
+determined a default of four is used instead.</p>
+<p>By default when an <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> is running a
+<a class="reference external" href="https://tqdm.github.io/">tqdm</a> progress indicator is shown, advanced as each task
+is completed. This may be suppressed by setting <em>show_progress</em> to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+<p>Because participants are typically run in multiple processes, they cannot reliably
+write to a single log file without synchronization, which is both cumberson and can
+significantly degrade performance. Alhazen supplies a mechanism to more easily
+facilitate logging of results. A file name can be supplied as a value of the <em>logfile</em>
+parameter, in which case it names a file that will be opened for writing when the
+experiment is run, and closed when it finishes. Each worker process also maintains a
+similar temporary file which it can write to independently, and Alhazon than
+concatenates all these files into the main log file when the experiment concludes.
+Within the various methods the programmer overrides the log can be written to suing
+the <a class="reference internal" href="#alhazen.Experiment.log" title="alhazen.Experiment.log"><code class="xref py py-meth docutils literal notranslate"><span class="pre">log()</span></code></a> method.</p>
+<p>It is frequently useful to write log files as Comma Separated Values (CSV) files. The
+<em>logfile</em> will effectively be wrapped with a Python <code class="xref py py-class docutils literal notranslate"><span class="pre">csv.writer</span></code> if <em>csv</em> is
+not false. If the value of <em>csv</em> is <cite>“dict”</cite> that CSV writer will be a <cite>DictWriter
+&lt;https://docs.python.org/3/library/csv.html#csv.DictWriter/&gt;_</cite> When that CSV writer is
+configured the values of <em>fieldnames</em>, <em>restval</em>, <em>extrasaction</em> and <em>dialect</em> are
+passed to it. If <em>csv</em> is false most of those parameters are ignored; the exception is
+<em>fieldnames</em> which, if provided, is written as a header in the resulting log file.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="alhazen.Experiment.participants">
+<span class="sig-name descname"><span class="pre">participants</span></span><a class="headerlink" href="#alhazen.Experiment.participants" title="Link to this definition">¶</a></dt>
+<dd><p>The number of particpants specified when this <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> was created.
+This is a read only attribute and cannot be modified after the <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a>
+is created.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="alhazen.Experiment.conditions">
+<span class="sig-name descname"><span class="pre">conditions</span></span><a class="headerlink" href="#alhazen.Experiment.conditions" title="Link to this definition">¶</a></dt>
+<dd><p>A tuple containing the conditions specified when this <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> was
+created. This is a read only attribute and cannot be modified after the
+<a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> is created.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="alhazen.Experiment.process_count">
+<span class="sig-name descname"><span class="pre">process_count</span></span><a class="headerlink" href="#alhazen.Experiment.process_count" title="Link to this definition">¶</a></dt>
+<dd><p>The number of worker processes this <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> will use. This may
+differ from the number specified when the <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> was created, either
+because that number was zero, or because there are fewer actual tasks to perform.
+This is a read only attribute and cannot be modified after the <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a>
+is created.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="alhazen.Experiment.show_progress">
+<span class="sig-name descname"><span class="pre">show_progress</span></span><a class="headerlink" href="#alhazen.Experiment.show_progress" title="Link to this definition">¶</a></dt>
+<dd><p>Whether or not to show a progress indicator while this <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> is
+running. This is a read only attribute and cannot be modified after the
+<a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> is created.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.Experiment.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment.run" title="Link to this definition">¶</a></dt>
+<dd><p>This method is called by the programmer to begin processing of the various
+tasks of this <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a>. It creates one or more worker processes, and
+partitions tasks between them ensuring that one, and exactly one, worker process
+executes a task only once for each pairing of a participant and a condition, for
+all the participants and all the conditions. The <a class="reference internal" href="#alhazen.Experiment.run_participant" title="alhazen.Experiment.run_participant"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code></a> method
+must have been overridden to define the task to be run in the worker processes.
+Typically other methods are overridden to aggregate the results of these tasks,
+and possibly to setup data structures and other state required by them. If any
+keyword arguments are supplied when calling <a class="reference internal" href="#alhazen.Experiment.run" title="alhazen.Experiment.run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run()</span></code></a> they are passed to the
+<a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a>’s <a class="reference internal" href="#alhazen.Experiment.prepare_experiment" title="alhazen.Experiment.prepare_experiment"><code class="xref py py-meth docutils literal notranslate"><span class="pre">prepare_experiment()</span></code></a> method. Returns the value
+returned by the <a class="reference internal" href="#alhazen.Experiment.finish_experiment" title="alhazen.Experiment.finish_experiment"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_experiment()</span></code></a> method, or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.Experiment.run_participant">
+<span class="sig-name descname"><span class="pre">run_participant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">participant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment.run_participant" title="Link to this definition">¶</a></dt>
+<dd><p>This is the principal method called in a worker process, and each call of this
+method executes the task of one participant in the given <em>condition</em>. The
+<em>participant</em> is a non-negative integer identifying the participant. The <em>context</em>
+is a dictionary possibly containing additional parameters or other information
+used by the tasks and provided by the <a class="reference internal" href="#alhazen.Experiment.prepare_condition" title="alhazen.Experiment.prepare_condition"><code class="xref py py-meth docutils literal notranslate"><span class="pre">prepare_condition()</span></code></a> and/or
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">prepare_participant()</span></code> methods. This method typically returns a value, which
+is provided to the control process’s <a class="reference internal" href="#alhazen.Experiment.finish_participant" title="alhazen.Experiment.finish_participant"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_participant()</span></code></a> method. Any value
+<a class="reference internal" href="#alhazen.Experiment.run_participant" title="alhazen.Experiment.run_participant"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code></a> returns must be
+<a class="reference external" href="https://docs.python.org/3.7/library/pickle.html#pickle-picklable">picklable</a>.
+This method must be overridden by subclasses, and should not be called directly by
+the programmer. The default implementation of this method raises a
+<code class="xref py py-exc docutils literal notranslate"><span class="pre">NotImplementedError</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.Experiment.finish_participant">
+<span class="sig-name descname"><span class="pre">finish_participant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">participant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">result</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment.finish_participant" title="Link to this definition">¶</a></dt>
+<dd><p>The control process calls this method after each participant’s task has been
+completed by a worker process. Passed as <em>result</em> is the value returned by the
+<a class="reference internal" href="#alhazen.Experiment.run_participant" title="alhazen.Experiment.run_participant"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code></a> method in the worker process, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if no value was
+returned. The value returned by this method, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if none is returned, is
+stored for passing to the <a class="reference internal" href="#alhazen.Experiment.finish_condition" title="alhazen.Experiment.finish_condition"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_condition()</span></code></a> method when it is eventually
+called.. The <a class="reference internal" href="#alhazen.Experiment.finish_participant" title="alhazen.Experiment.finish_participant"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_participant()</span></code></a> method is intended to be overridden in
+subclasses, and should not be called directly by the programmer. The default
+implementation of this method returns the value of its <em>result</em> parameter
+unchanged.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.Experiment.prepare_condition">
+<span class="sig-name descname"><span class="pre">prepare_condition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment.prepare_condition" title="Link to this definition">¶</a></dt>
+<dd><p>The control process calls this method before asking the workers to execute
+tasks in the given <em>condition</em>. The <em>context</em> is a dictionary into which the
+method may write information that it wishes to pass to the task in the worker
+processes. Information added to the <em>context</em> must be
+<a class="reference external" href="https://docs.python.org/3.7/library/pickle.html#pickle-picklable">picklable</a>.
+This method is intended to be overridden in subclasses, and should not be called
+directly by the programmer. The default implementation of this method does
+nothing.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.Experiment.finish_condition">
+<span class="sig-name descname"><span class="pre">finish_condition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">results</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment.finish_condition" title="Link to this definition">¶</a></dt>
+<dd><p>The control process calls this method after all the participants performing
+the task in a particular condition have finished and <a class="reference internal" href="#alhazen.Experiment.finish_participant" title="alhazen.Experiment.finish_participant"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_participant()</span></code></a>
+has been called for them. This method is called only once for each condition.
+Passed as <em>results</em> is a list of results returned by the calls of the
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_particpant()</span></code> method. The value returned by this method, or <code class="docutils literal notranslate"><span class="pre">None</span></code>
+if none is returned, is stored for passing to <a class="reference internal" href="#alhazen.Experiment.finish_experiment" title="alhazen.Experiment.finish_experiment"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_experiment()</span></code></a> when the
+tasks for all conditions have been finished. The <a class="reference internal" href="#alhazen.Experiment.finish_condition" title="alhazen.Experiment.finish_condition"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_condition()</span></code></a> method
+is intended to be overridden in subclasses, and should not be called directly by
+the programmer. The default implementation of this method returns the value of its
+<em>results</em> parameter unchanged.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.Experiment.prepare_experiment">
+<span class="sig-name descname"><span class="pre">prepare_experiment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment.prepare_experiment" title="Link to this definition">¶</a></dt>
+<dd><p>The control process calls this method, once, before any of the other methods in
+the public API. If any keyword arguments were passed to to <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a>’s
+<a class="reference internal" href="#alhazen.Experiment.run" title="alhazen.Experiment.run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run()</span></code></a> method, they are passed to this method. It can be used to allocate data
+structures or initialize other state required by the experiment. It can count on
+the <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a>’s <em>process_count</em> slot to have been initialized to the
+number of workers that will actually be used, as well as its <em>conditions</em> slot
+containing a list. This method is intended to be overridden in subclasses, and
+should not be called directly by the programmer. The default implementation of this
+method does nothing.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.Experiment.setup">
+<span class="sig-name descname"><span class="pre">setup</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment.setup" title="Link to this definition">¶</a></dt>
+<dd><p>Each worker process calls this method, once, before performing the
+work of any participants for any condtion. It can be used to allocate data
+structures or initialize other state required by the worker processes. This method
+is intended to be overridden in subclasses, and should not be called directly by
+the programmer. The default implementation of this method does nothing.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.Experiment.finish_experiment">
+<span class="sig-name descname"><span class="pre">finish_experiment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment.finish_experiment" title="Link to this definition">¶</a></dt>
+<dd><p>The control process calls this method, once, after all the participants have been run
+in each of the conditions, and the corresponding calls to <a class="reference internal" href="#alhazen.Experiment.finish_condition" title="alhazen.Experiment.finish_condition"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_condition()</span></code></a>
+have all completed. Passed as <em>results</em> is a dictionary indexed by the
+experiment’s conditions, the values being the corresponding values returned by the
+calls to <a class="reference internal" href="#alhazen.Experiment.finish_condition" title="alhazen.Experiment.finish_condition"><code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_condition()</span></code></a>. The value returned by this method, or <code class="docutils literal notranslate"><span class="pre">None</span></code>
+if none is returned, is returned by the <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a>’s <a class="reference internal" href="#alhazen.Experiment.run" title="alhazen.Experiment.run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run()</span></code></a> method.
+The <code class="xref py py-meth docutils literal notranslate"><span class="pre">finish_exerpiment()</span></code> method is intended to be overridden in subclasses,
+and should not be called directly by the programmer. This method is intended to be
+overridden in subclasses, and should not be called directly by the programmer. The
+default implementation of this method returns <em>results</em> unchanged.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.Experiment.log">
+<span class="sig-name descname"><span class="pre">log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">thing</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">more</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiple</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.Experiment.log" title="Link to this definition">¶</a></dt>
+<dd><p>Writes information to the Alhazen log file.
+If there is no log file this method does nothing. If the log file is not a CSV log
+file it effectively passes all its arguments to the normal Python <cite>print</cite>
+function, albeit with the output directed to the log file. Otherwise it
+effectively calls <a class="reference external" href="https://docs.python.org/3/library/csv.html#csv.csvwriter.writerow">writerow</a> on <em>thing</em>;
+if <em>multiple</em> is true, it instead calls <a class="reference external" href="https://docs.python.org/3/library/csv.html#csv.csvwriter.writerows">writerows</a>.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="iterated-experiments">
+<h3>Iterated Experiments<a class="headerlink" href="#iterated-experiments" title="Link to this heading">¶</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="alhazen.IteratedExperiment">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">alhazen.</span></span><span class="sig-name descname"><span class="pre">IteratedExperiment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.IteratedExperiment" title="Link to this definition">¶</a></dt>
+<dd><p>This is a an abstract base class, a subclass of <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a>, for
+experiements where each participant performs a sequence of identical or similar
+actions, one per round. The <em>rounds</em> is the maximum number of rounds that will be
+executted. If <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_continue" title="alhazen.IteratedExperiment.run_participant_continue"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_continue()</span></code></a> is overriden is is possible that fewer
+than <em>rounds</em> rounds will be executed. The <em>rounds</em> should be a positive integer, and,
+if not supplied, defaults to 1.</p>
+<p>This subclass overrides <code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code>. Typically the programmer will not
+override <code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code> themself, but if they do, they should generally
+be sure to call the superclass’s (that is, <a class="reference internal" href="#alhazen.IteratedExperiment" title="alhazen.IteratedExperiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">IteratedExperiment</span></code></a>’s) version,
+and return the value it returns. <a class="reference internal" href="#alhazen.IteratedExperiment" title="alhazen.IteratedExperiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">IteratedExperiment</span></code></a>’s <code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code>
+decomposes this activity into four finer grained methods, all called in the worker
+process: <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_prepare" title="alhazen.IteratedExperiment.run_participant_prepare"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_prepare()</span></code></a>, <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a>,
+<a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_continue" title="alhazen.IteratedExperiment.run_participant_continue"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_continue()</span></code></a>, and <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_finish" title="alhazen.IteratedExperiment.run_participant_finish"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_finish()</span></code></a>, all inteded for
+overriding. The programmer must override at least <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a>, which
+is called repeatedly, once for each round, and should return a
+<a class="reference external" href="https://docs.python.org/3.7/library/pickle.html#pickle-picklable">picklable</a> value
+which which is accumlated into a list, indexed by round. This list is returned to the
+parent, control process as the result for the participant and condition.</p>
+<p>As a subclass of <a class="reference internal" href="#alhazen.Experiment" title="alhazen.Experiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">Experiment</span></code></a> the other methods and attributes of that parent
+class are, of course, also available.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="alhazen.IteratedExperiment.rounds">
+<span class="sig-name descname"><span class="pre">rounds</span></span><a class="headerlink" href="#alhazen.IteratedExperiment.rounds" title="Link to this definition">¶</a></dt>
+<dd><p>The maximum number of rounds specified when this <a class="reference internal" href="#alhazen.IteratedExperiment" title="alhazen.IteratedExperiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">IteratedExperiment</span></code></a>
+was created. This is a read only attribute and cannot be modified after the
+<a class="reference internal" href="#alhazen.IteratedExperiment" title="alhazen.IteratedExperiment"><code class="xref py py-class docutils literal notranslate"><span class="pre">IteratedExperiment</span></code></a> is created.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.IteratedExperiment.run_participant_prepare">
+<span class="sig-name descname"><span class="pre">run_participant_prepare</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">participant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.IteratedExperiment.run_participant_prepare" title="Link to this definition">¶</a></dt>
+<dd><p>This method is called at the start of a worker process running a participant’s
+activity, before the loop in which <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a> is called. Its
+arguments are as for <code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code>. Any changes it makes to <em>context</em>
+will be visible to future calls to <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_continue" title="alhazen.IteratedExperiment.run_participant_continue"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_continue()</span></code></a>,
+<a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a> and <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_finish" title="alhazen.IteratedExperiment.run_participant_finish"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_finish()</span></code></a> by this participant
+in this condtion, but not any others. This method is intended to be overridden in
+subclasses, and should not be called directly by the programmer. The default
+implementation of this method does nothing.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.IteratedExperiment.run_participant_run">
+<span class="sig-name descname"><span class="pre">run_participant_run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">round</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">participant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.IteratedExperiment.run_participant_run" title="Link to this definition">¶</a></dt>
+<dd><p>This method should be overriden to perform one round’s worth of activity by the
+participant, in a worker process. The <em>round</em> is a non-negative integer which
+describes round this is; it starts at zero and increases by one at each iteration.
+The <em>participant</em>, <em>condition</em> and <em>context</em> are as for <code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code>.
+Any changes made to the <em>context</em> by <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_prepare" title="alhazen.IteratedExperiment.run_participant_prepare"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_prepare()</span></code></a> or by
+previous invocations of <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a> or
+<a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_continue" title="alhazen.IteratedExperiment.run_participant_continue"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_continue()</span></code></a> are retained in the <em>context</em> presented to this
+method, and any changes this method makes to its <em>context</em> are propogated to
+future calls of <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_continue" title="alhazen.IteratedExperiment.run_participant_continue"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_continue()</span></code></a> and <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a>
+by this participant in this condition, but not to any others. The value returned
+by this method, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if no value is returned, is collected into a list with
+other return values of this method for other rounds by this participant in this
+condition, which list is eventually passed to the <code class="xref py py-meth docutils literal notranslate"><span class="pre">run_particiapnt_finish()</span></code>
+method. This method must be overridden by subclasses, and should not be called
+directly by the programmer. The default implementation of this method raises a
+<code class="xref py py-exc docutils literal notranslate"><span class="pre">NotImplementedError</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.IteratedExperiment.run_participant_continue">
+<span class="sig-name descname"><span class="pre">run_participant_continue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">round</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">participant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.IteratedExperiment.run_participant_continue" title="Link to this definition">¶</a></dt>
+<dd><p>This method is called in a worker process before each call of
+<a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a>. If it returns <code class="docutils literal notranslate"><span class="pre">True</span></code> (or any truthy value) the
+iterations continue and <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a> is called. If it returns
+<code class="docutils literal notranslate"><span class="pre">False</span></code> (or any falsey value) this participant’s activities in this condition
+end with no more rounds. The values of <em>round</em>, <em>participant</em>, <em>condition</em> and
+<em>context</em> are as for <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a>. Any changes made to the
+<em>context</em> by <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_prepare" title="alhazen.IteratedExperiment.run_participant_prepare"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_prepare()</span></code></a> or by previous invocations of
+<a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a> or <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_continue" title="alhazen.IteratedExperiment.run_participant_continue"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_continue()</span></code></a> are retained in
+the <em>context</em> presented to this method, and any changes this method makes to its
+<em>context</em> are propogated to future calls of <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_continue" title="alhazen.IteratedExperiment.run_participant_continue"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_continue()</span></code></a>,
+<a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a> and <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_finish" title="alhazen.IteratedExperiment.run_participant_finish"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_finish()</span></code></a> by this participant
+in this condition, but not to any others. This method is intended to be overridden
+in subclasses, and should not be called directly by the programmer. The default
+implementation of this method returns <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="alhazen.IteratedExperiment.run_participant_finish">
+<span class="sig-name descname"><span class="pre">run_participant_finish</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">participant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">results</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#alhazen.IteratedExperiment.run_participant_finish" title="Link to this definition">¶</a></dt>
+<dd><p>This method is called after all the rounds for a participant in a condition
+have been executed. The <em>participant</em> and <em>condition</em> are as for
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant()</span></code>. Passed as <em>results</em> is a list of the values returned by
+the successive invocations of the <a class="reference internal" href="#alhazen.IteratedExperiment.run_participant_run" title="alhazen.IteratedExperiment.run_participant_run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_participant_run()</span></code></a> method, indexable by
+round. This method should return a <a class="reference external" href="https://docs.python.org/3.7/library/pickle.html#pickle-picklable">picklable</a> value which
+will be returned to the control process for this participant and condition. This
+method is intended to be overridden in subclasses, and should not be called
+directly by the programmer. The default implementation of this method returns
+<em>results</em> unchanged.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">Alhazen</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2020-2025, Carnegie Mellon University.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
